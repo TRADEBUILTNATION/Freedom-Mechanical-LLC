@@ -754,6 +754,8 @@ h1 {
   background: rgba(0, 0, 0, 0.46);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .modal-overlay[hidden] {
@@ -762,10 +764,13 @@ h1 {
 
 .modal {
   width: min(560px, 100%);
+  max-height: calc(100svh - 36px);
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(180deg, rgba(16, 20, 30, 0.92), rgba(10, 12, 18, 0.92));
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
   transform: translateY(14px) scale(0.98);
   opacity: 0;
   transition:
@@ -785,6 +790,7 @@ h1 {
   align-items: start;
   gap: 10px;
   padding: 16px 16px 10px;
+  flex: 0 0 auto;
 }
 
 .modal-brand {
@@ -868,10 +874,19 @@ h1 {
   padding: 0 16px 16px;
   color: var(--muted);
   line-height: 1.6;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
 }
 
 .modal-body p {
   margin: 0 0 12px;
+}
+
+@media (max-height: 740px) {
+  .modal-overlay {
+    place-items: start center;
+  }
 }
 
 .modal-lede {
