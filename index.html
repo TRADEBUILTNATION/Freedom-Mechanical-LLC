@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Freedom Mechanical LLC — dependable HVAC and mechanical services."
+    />
+    <title>Home | Freedom Mechanical LLC</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" data-elevates="false">
+      <div class="container header-inner">
+        <a class="brand" href="#home" aria-label="Freedom Mechanical LLC — Home">
+          <img
+            class="brand-mark brand-mark-img"
+            src="./Assets/Flag%20Icon.png"
+            alt=""
+            width="44"
+            height="26"
+            decoding="async"
+            loading="eager"
+          />
+          <span class="brand-text">Freedom Mechanical LLC</span>
+        </a>
+
+        <button
+          class="nav-toggle"
+          type="button"
+          aria-label="Open menu"
+          aria-expanded="false"
+          aria-controls="site-nav"
+        >
+          <span class="nav-toggle-lines" aria-hidden="true"></span>
+        </button>
+
+        <nav class="site-nav" id="site-nav" aria-label="Primary">
+          <div class="nav-links">
+            <a class="nav-link" href="#home">Home</a>
+            <a class="nav-link" href="#services">Services</a>
+            <a class="nav-link" href="#shop">Shop</a>
+            <button class="nav-link nav-link-btn" type="button" data-modal-trigger="online-service">
+              Online Service
+            </button>
+            <a class="nav-link" href="#contact">Contact</a>
+          </div>
+          <a
+            class="phone"
+            href="tel:+15864804864"
+            aria-label="Contact Us: (586) 480-4864"
+          >
+            Contact Us: (586) 480-4864
+          </a>
+          <a class="cta cta-pulse" href="#schedule" data-modal-trigger="schedule">
+            <span class="cta-label">
+              <i
+                class="fa-solid fa-fire-flame-curved cta-ico cta-ico-flame"
+                aria-hidden="true"
+              ></i>
+              <span class="cta-text">Schedule Online Here!</span>
+              <i class="fa-regular fa-snowflake cta-ico cta-ico-snow" aria-hidden="true"></i>
+            </span>
+          </a>
+        </nav>
+      </div>
+      <div class="nav-backdrop" hidden></div>
+    </header>
+
+    <main id="main"></main>
+
+    <!-- Modal overlay (does not navigate / change the page) -->
+    <div class="modal-overlay" id="modal" hidden>
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        aria-describedby="modal-desc"
+      >
+        <div class="modal-header">
+          <div class="modal-brand">
+            <img
+              class="modal-logo"
+              src="./Assets/Flag%20Icon.png"
+              alt="Freedom Mechanical LLC"
+              width="44"
+              height="26"
+              decoding="async"
+              loading="lazy"
+            />
+            <h2 class="modal-title" id="modal-title">
+              Schedule an Appointment Online!
+            </h2>
+          </div>
+          <button class="modal-close" type="button" data-modal-close aria-label="Close">
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+        <div class="modal-body" id="modal-desc"></div>
+      </div>
+    </div>
+
+    <footer class="site-footer" id="terms" aria-label="Legal">
+      <div class="container footer-inner">
+        <p class="legal legal-primary">
+          © <span id="legal-year">2025</span> Freedom Mechanical LLC. All rights reserved.
+          <span class="legal-sep" aria-hidden="true">•</span>
+          <span class="legal-note">
+            <a class="legal-link" href="#terms">Terms &amp; Agreements</a> are subject to change
+            without notice.
+          </span>
+        </p>
+      </div>
+    </footer>
+
+    <script src="./script.js" defer></script>
+  </body>
+</html>
+
+
