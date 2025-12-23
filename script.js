@@ -2,6 +2,56 @@
   const yearEl = document.getElementById("legal-year");
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
+  // Favicon: browsers render favicons in a square. If we "contain" a very wide logo, it looks tiny.
+  // To make it *appear bigger* while still using the same source image, generate a square crop.
+  // (The browser still controls actual display size in the tab.)
+  const setSquareFaviconFromLogo = (src) => {
+    const iconLink =
+      document.getElementById("site-favicon") ||
+      document.querySelector('link[rel="icon"]');
+    const shortcutLink =
+      document.getElementById("site-favicon-shortcut") ||
+      document.querySelector('link[rel="shortcut icon"]');
+
+    if (!iconLink && !shortcutLink) return;
+
+    const img = new Image();
+    img.decoding = "async";
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      // Use a larger canvas so the downscaled favicon stays crisp on HiDPI displays.
+      const size = 128;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.clearRect(0, 0, size, size);
+
+      // Crop a square from the top-left of the image and scale it into the favicon square.
+      // Add a bit of padding so it doesn't feel "too big" in the browser tab UI.
+      const cropSize = Math.min(img.width, img.height);
+      const sx = 0;
+      const sy = 0;
+      const pad = Math.round(size * 0.11); // ~11% padding on each side
+      const target = size - pad * 2;
+      ctx.drawImage(img, sx, sy, cropSize, cropSize, pad, pad, target, target);
+
+      const dataUrl = canvas.toDataURL("image/png");
+      if (iconLink) iconLink.setAttribute("href", dataUrl);
+      if (shortcutLink) shortcutLink.setAttribute("href", dataUrl);
+    };
+    img.onerror = () => {
+      // Keep the static PNG fallback from <head> if anything fails.
+    };
+
+    // Cache-bust so changes show up immediately.
+    img.src = `${src}${src.includes("?") ? "&" : "?"}v=4`;
+  };
+
+  setSquareFaviconFromLogo("./Assets/Flag%20Icon.png");
+
   const body = document.body;
   const header = document.querySelector(".site-header");
   const nav = document.getElementById("site-nav");
@@ -168,6 +218,49 @@
   let address = { street: "", city: "", state: "", zip: "" };
   let returnToReview = false;
   let editMode = null; // "lead" | "system" | "service" | "address" | null
+  let additional = { details: "", photos: [] }; // photos are optional; details required
+  let schedule = { date: "", startMin: null, endMin: null }; // 4-hour block
+
+  // Splash timing
+  const SPLASH_MS = 1850; // 1s faster than before (2850ms)
+  // Keep the "final details" splash aligned so all icons get equal time too.
+  const FINAL_SPLASH_MS = SPLASH_MS;
+
+  const captureLeadDraft = (form) => {
+    if (!form) return;
+    lead = {
+      name: (form.querySelector("#lead-name")?.value || lead.name || "").trim(),
+      phone: (form.querySelector("#lead-phone")?.value || lead.phone || "").trim(),
+      email: (form.querySelector("#lead-email")?.value || lead.email || "").trim(),
+    };
+  };
+
+  const captureSystemDraft = (form) => {
+    if (!form) return;
+    const selected = form.querySelector('input[name="systemType"]:checked');
+    if (selected) systemType = String(selected.value || systemType || "").trim();
+    const heatSel = form.querySelector("#equip-heat");
+    const coolSel = form.querySelector("#equip-cool");
+    const activeSel = systemType === "Heating System" ? heatSel : coolSel;
+    const equip = (activeSel?.value || "").trim();
+    if (equip) systemEquipmentType = equip;
+  };
+
+  const captureServiceDraft = (form) => {
+    if (!form) return;
+    const selected = form.querySelector('input[name="serviceType"]:checked');
+    if (selected) serviceType = String(selected.value || serviceType || "").trim();
+  };
+
+  const captureAddressDraft = (form) => {
+    if (!form) return;
+    address = {
+      street: (form.querySelector("#addr-street")?.value || address.street || "").trim(),
+      city: (form.querySelector("#addr-city")?.value || address.city || "").trim(),
+      state: (form.querySelector("#addr-state")?.value || address.state || "").trim(),
+      zip: (form.querySelector("#addr-zip")?.value || address.zip || "").trim(),
+    };
+  };
 
   const getFocusable = (root) =>
     Array.from(
@@ -208,6 +301,74 @@
       const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
       return map[ch] || ch;
     });
+
+  const formatBytes = (bytes) => {
+    const n = Number(bytes || 0);
+    if (!Number.isFinite(n) || n <= 0) return "0 KB";
+    const units = ["B", "KB", "MB", "GB"];
+    const idx = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
+    const val = n / 1024 ** idx;
+    return `${val >= 10 || idx === 0 ? Math.round(val) : val.toFixed(1)} ${units[idx]}`;
+  };
+
+  const pad2 = (n) => String(n).padStart(2, "0");
+
+  const formatTime = (mins) => {
+    const m = Number(mins);
+    if (!Number.isFinite(m)) return "";
+    const h24 = Math.floor(m / 60);
+    const mm = m % 60;
+    const ampm = h24 >= 12 ? "PM" : "AM";
+    const h12 = ((h24 + 11) % 12) + 1;
+    return `${h12}:${pad2(mm)} ${ampm}`;
+  };
+
+  const yyyyMmDd = (d) => {
+    const y = d.getFullYear();
+    const m = pad2(d.getMonth() + 1);
+    const day = pad2(d.getDate());
+    return `${y}-${m}-${day}`;
+  };
+
+  const formatDateLong = (dateStr) => {
+    try {
+      const d = new Date(`${dateStr}T00:00:00`);
+      return d.toLocaleDateString(undefined, {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return dateStr || "";
+    }
+  };
+
+  const businessHoursForDate = (dateStr) => {
+    // dateStr is YYYY-MM-DD
+    const d = new Date(`${dateStr}T00:00:00`);
+    const day = d.getDay(); // 0 Sun .. 6 Sat
+
+    // Sunday closed
+    if (day === 0) return null;
+
+    // Saturday: 9:00am - 2:00pm
+    if (day === 6) return { open: 9 * 60, close: 14 * 60 };
+
+    // Mon-Fri: 8:30am - 6:00pm
+    return { open: 8 * 60 + 30, close: 18 * 60 };
+  };
+
+  const generateFourHourBlocks = (hours) => {
+    const blocks = [];
+    const duration = 4 * 60;
+    const step = 30; // 30-minute increments
+    const lastStart = hours.close - duration;
+    for (let start = hours.open; start <= lastStart; start += step) {
+      blocks.push({ start, end: start + duration });
+    }
+    return blocks;
+  };
 
   const leadStepHtml = () => `
     <form class="modal-form" data-lead-form>
@@ -283,7 +444,20 @@
         <i class="fa-solid fa-wind splash-ico splash-ico-air" aria-hidden="true"></i>
       </div>
       <p class="splash-title"><strong>One moment…</strong></p>
-      <p class="splash-sub">Loading the next step.</p>
+      <p class="splash-sub">Information saved. Loading the next step.</p>
+    </div>
+  `;
+
+  const splashStepHtmlCustom = ({ title, sub }) => `
+    <div class="modal-splash" role="status" aria-live="polite">
+      <div class="splash-stage" aria-hidden="true">
+        <i class="fa-solid fa-fire-flame-curved splash-ico splash-ico-flame" aria-hidden="true"></i>
+        <i class="fa-regular fa-snowflake splash-ico splash-ico-snow" aria-hidden="true"></i>
+        <i class="fa-solid fa-fan splash-ico splash-ico-vent" aria-hidden="true"></i>
+        <i class="fa-solid fa-wind splash-ico splash-ico-air" aria-hidden="true"></i>
+      </div>
+      <p class="splash-title"><strong>${escapeHtml(title)}</strong></p>
+      <p class="splash-sub">${escapeHtml(sub)}</p>
     </div>
   `;
 
@@ -363,6 +537,9 @@
       <p class="form-error" data-form-error hidden></p>
 
       <div class="modal-actions">
+        <button class="ghost" type="button" data-step-back>
+          ${returnToReview && editMode === "address" ? "Cancel" : "Back"}
+        </button>
         <button class="cta" type="submit">${returnToReview && editMode === "address" ? "Save" : "Next"}</button>
       </div>
     </form>
@@ -377,7 +554,10 @@
       <div class="review">
         <section class="review-section" aria-label="Contact information">
           <div class="review-head">
-            <span class="review-title">Contact</span>
+            <span class="review-title-wrap">
+              <span class="review-ico" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
+              <span class="review-title">Contact</span>
+            </span>
             <button class="review-edit" type="button" data-edit-step="lead">Edit</button>
           </div>
           <dl class="review-list">
@@ -389,7 +569,10 @@
 
         <section class="review-section" aria-label="System information">
           <div class="review-head">
-            <span class="review-title">System</span>
+            <span class="review-title-wrap">
+              <span class="review-ico" aria-hidden="true"><i class="fa-solid fa-temperature-half"></i></span>
+              <span class="review-title">System</span>
+            </span>
             <button class="review-edit" type="button" data-edit-step="system">Edit</button>
           </div>
           <dl class="review-list">
@@ -400,7 +583,10 @@
 
         <section class="review-section" aria-label="Service information">
           <div class="review-head">
-            <span class="review-title">Service</span>
+            <span class="review-title-wrap">
+              <span class="review-ico" aria-hidden="true"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+              <span class="review-title">Service</span>
+            </span>
             <button class="review-edit" type="button" data-edit-step="service">Edit</button>
           </div>
           <dl class="review-list">
@@ -410,7 +596,10 @@
 
         <section class="review-section" aria-label="Address information">
           <div class="review-head">
-            <span class="review-title">Address</span>
+            <span class="review-title-wrap">
+              <span class="review-ico" aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>
+              <span class="review-title">Address</span>
+            </span>
             <button class="review-edit" type="button" data-edit-step="address">Edit</button>
           </div>
           <dl class="review-list">
@@ -423,10 +612,145 @@
       </div>
 
       <div class="modal-actions">
+        <button class="ghost" type="button" data-step-back>Back</button>
+        <button class="cta" type="submit">Next</button>
+      </div>
+    </form>
+  `;
+
+  const additionalDetailsStepHtml = () => `
+    <form class="modal-form" data-additional-form>
+      <p class="modal-lede">
+        <strong>Additional System Information</strong>
+      </p>
+
+      <div class="field">
+        <label class="label" for="add-details">
+          Describe what you are experiencing with your system
+          <span class="req" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
+        </label>
+        <textarea
+          class="input input-textarea"
+          id="add-details"
+          name="details"
+          rows="4"
+          required
+          placeholder="Enter your system’s symptoms here…"
+        >${escapeHtml(additional.details)}</textarea>
+        <div class="hint">
+          <div class="hint-title">Examples:</div>
+          <ul class="hint-list">
+            <li><strong>Heating:</strong> “My furnace flame goes out as soon as the burners light.”</li>
+            <li>
+              <strong>Cooling:</strong> “My system is blowing warm air out of the vents and the outdoor unit fan isn’t
+              spinning.”
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="divider" role="separator" aria-hidden="true"></div>
+
+      <div class="field">
+        <label class="label" for="add-photos">Photos (recommended)</label>
+        <input class="input" id="add-photos" name="photos" type="file" accept="image/*" multiple />
+        <p class="hint">
+          Recommended: equipment model #, thermostat display, error code, and the equipment and work area.
+        </p>
+        <div class="photo-list" id="add-photo-list" aria-live="polite"></div>
+      </div>
+
+      <p class="form-error" data-form-error hidden></p>
+
+      <div class="modal-actions">
+        <button class="ghost" type="button" data-step-back>Back</button>
         <button class="cta" type="submit">Confirm &amp; Continue</button>
       </div>
     </form>
   `;
+
+  const scheduleStepHtml = () => {
+    const today = new Date();
+    const min = yyyyMmDd(today);
+    const max = yyyyMmDd(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 30));
+
+    return `
+      <form class="modal-form" data-schedule-form>
+        <p class="modal-lede">
+          <strong>Schedule your appointment</strong>
+        </p>
+
+        <div class="field">
+          <label class="label" for="sched-date">
+            Click to select a date <span class="req" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
+          </label>
+          <input
+            class="input"
+            id="sched-date"
+            name="date"
+            type="date"
+            required
+            min="${min}"
+            max="${max}"
+            value="${escapeHtml(schedule.date)}"
+          />
+          <p class="hint">
+            Hours: Mon–Fri 8:30 AM–6:00 PM, Sat 9:00 AM–2:00 PM, Sun closed.
+          </p>
+        </div>
+
+        <div class="field" id="sched-slots-field" ${schedule.date ? "" : "hidden"}>
+          <div class="label">
+            Choose a 4‑hour time block <span class="req" aria-hidden="true">*</span>
+            <span class="sr-only"> (required)</span>
+          </div>
+          <div class="slots" id="sched-slots" role="listbox" aria-label="Available time blocks"></div>
+          <p class="form-error" data-form-error hidden></p>
+        </div>
+
+        <div class="modal-actions">
+          <button class="ghost" type="button" data-step-back>Back</button>
+          <button class="cta" type="submit">Confirm &amp; Continue</button>
+        </div>
+      </form>
+    `;
+  };
+
+  const scheduleConfirmationStepHtml = () => {
+    const dateText = schedule.date ? formatDateLong(schedule.date) : "";
+    const timeText =
+      schedule.startMin != null && schedule.endMin != null
+        ? `${formatTime(schedule.startMin)} – ${formatTime(schedule.endMin)}`
+        : "";
+
+    return `
+      <form class="modal-form" data-schedule-confirm-form>
+        <p class="modal-lede">
+          <span class="confirm-icon" aria-hidden="true"><i class="fa-solid fa-circle-check"></i></span>
+          <strong class="confirm-title">Appointment scheduled</strong>
+        </p>
+
+        <div class="notice">
+          <p class="notice-title"><strong>Appointment Details:</strong></p>
+          <p class="notice-line">
+            ${escapeHtml(dateText)}${dateText && timeText ? " • " : ""}${escapeHtml(timeText)}
+          </p>
+          <p class="notice-sub" style="margin-top:-4px; margin-bottom:10px;">
+            Your time window has been reserved.
+          </p>
+          <p class="notice-sub">
+            We’ll do our best to arrive within the selected 4-hour window. If demand requires, a member of our team may
+            contact you to adjust the scheduled time.
+          </p>
+        </div>
+
+        <div class="modal-actions">
+          <button class="ghost" type="button" data-step-back>Back</button>
+          <button class="cta" type="button" data-modal-close>Finish</button>
+        </div>
+      </form>
+    `;
+  };
 
   const systemTypeStepHtml = () => `
     <form class="modal-form" data-system-form>
@@ -471,10 +795,16 @@
                     Select equipment
                   </option>
                   <option value="Furnace" ${systemEquipmentType === "Furnace" ? "selected" : ""}>Furnace</option>
-                  <option value="Boiler" ${systemEquipmentType === "Boiler" ? "selected" : ""}>Boiler</option>
                   <option value="Heat Pump" ${systemEquipmentType === "Heat Pump" ? "selected" : ""}>Heat Pump</option>
-                  <option value="Radiant" ${systemEquipmentType === "Radiant" ? "selected" : ""}>Radiant / In-floor</option>
-                  <option value="Other" ${systemEquipmentType === "Other" ? "selected" : ""}>Other / Not sure</option>
+                  <option value="Water Heater" ${systemEquipmentType === "Water Heater" ? "selected" : ""}>
+                    Water Heater
+                  </option>
+                  <option
+                    value="Tankless Water Heater"
+                    ${systemEquipmentType === "Tankless Water Heater" ? "selected" : ""}
+                  >
+                    Tankless Water Heater
+                  </option>
                 </select>
               </span>
             </span>
@@ -512,15 +842,19 @@
                   <option value="" ${systemType === "Cooling System" && !systemEquipmentType ? "selected" : ""}>
                     Select equipment
                   </option>
-                  <option value="Central A/C" ${systemEquipmentType === "Central A/C" ? "selected" : ""}>Central A/C</option>
+                  <option
+                    value="Central Air Conditioning"
+                    ${systemEquipmentType === "Central Air Conditioning" ? "selected" : ""}
+                  >
+                    Central Air Conditioning
+                  </option>
                   <option value="Ductless Mini-Split" ${systemEquipmentType === "Ductless Mini-Split" ? "selected" : ""}>
                     Ductless Mini-Split
                   </option>
-                  <option value="Heat Pump" ${systemEquipmentType === "Heat Pump" ? "selected" : ""}>Heat Pump</option>
-                  <option value="Window / Portable Unit" ${systemEquipmentType === "Window / Portable Unit" ? "selected" : ""}>
-                    Window / Portable Unit
+                  <option value="Ducted Mini-Split" ${systemEquipmentType === "Ducted Mini-Split" ? "selected" : ""}>
+                    Ducted Mini-Split
                   </option>
-                  <option value="Other" ${systemEquipmentType === "Other" ? "selected" : ""}>Other / Not sure</option>
+                  <option value="Heat Pump" ${systemEquipmentType === "Heat Pump" ? "selected" : ""}>Heat Pump</option>
                 </select>
               </span>
             </span>
@@ -531,6 +865,9 @@
       <p class="form-error" data-form-error hidden></p>
 
       <div class="modal-actions">
+        <button class="ghost" type="button" data-step-back>
+          ${returnToReview && editMode === "system" ? "Cancel" : "Back"}
+        </button>
         <button class="cta" type="submit">${returnToReview && editMode === "system" ? "Save" : "Next"}</button>
       </div>
     </form>
@@ -617,6 +954,9 @@
       <p class="form-error" data-form-error hidden></p>
 
       <div class="modal-actions">
+        <button class="ghost" type="button" data-step-back>
+          ${returnToReview && editMode === "service" ? "Cancel" : "Back"}
+        </button>
         <button class="cta" type="submit">${returnToReview && editMode === "service" ? "Save" : "Next"}</button>
       </div>
     </form>
@@ -646,6 +986,91 @@
     returnToReview = false;
     editMode = null;
     modalBody.innerHTML = reviewStepHtml();
+  };
+
+  const showAdditionalDetailsStep = () => {
+    modalBody.innerHTML = additionalDetailsStepHtml();
+    // Populate photo list immediately (in case user comes back here)
+    const list = modalOverlay.querySelector("#add-photo-list");
+    if (list) {
+      list.innerHTML =
+        additional.photos?.length > 0
+          ? additional.photos
+              .map((f) => `<div class="photo-item">${escapeHtml(f.name)} <span class="muted">(${escapeHtml(formatBytes(f.size))})</span></div>`)
+              .join("")
+          : `<div class="photo-item muted">No photos selected</div>`;
+    }
+  };
+
+  const showScheduleStep = () => {
+    modalBody.innerHTML = scheduleStepHtml();
+    // If a date is already selected, render slots.
+    const dateEl = modalOverlay.querySelector("#sched-date");
+    if (dateEl?.value) {
+      renderScheduleSlots(dateEl.value);
+    }
+    // Auto-open the native date picker when supported.
+    requestAnimationFrame(() => {
+      try {
+        dateEl?.focus?.();
+        dateEl?.showPicker?.();
+      } catch {
+        // ignore
+      }
+    });
+  };
+
+  const showScheduleConfirmationStep = () => {
+    modalTitle.textContent = "Thank you for scheduling an appointment with Freedom Mechanical LLC";
+    modalBody.innerHTML = scheduleConfirmationStepHtml();
+  };
+
+  const renderScheduleSlots = (dateStr) => {
+    const field = modalOverlay.querySelector("#sched-slots-field");
+    const slotsEl = modalOverlay.querySelector("#sched-slots");
+    const errorEl = modalOverlay.querySelector('[data-schedule-form] [data-form-error]');
+    if (!field || !slotsEl) return;
+
+    const hours = businessHoursForDate(dateStr);
+    field.hidden = false;
+
+    if (!hours) {
+      schedule.startMin = null;
+      schedule.endMin = null;
+      slotsEl.innerHTML = `<div class="slots-empty">Sunday is closed. Please choose another day.</div>`;
+      errorEl && (errorEl.hidden = true);
+      return;
+    }
+
+    const blocks = generateFourHourBlocks(hours);
+    if (blocks.length === 0) {
+      schedule.startMin = null;
+      schedule.endMin = null;
+      slotsEl.innerHTML = `<div class="slots-empty">No 4-hour blocks available for this day.</div>`;
+      errorEl && (errorEl.hidden = true);
+      return;
+    }
+
+    slotsEl.innerHTML = blocks
+      .map((b) => {
+        const selected = schedule.startMin === b.start && schedule.endMin === b.end;
+        const label = `${formatTime(b.start)} – ${formatTime(b.end)}`;
+        return `
+          <button
+            class="slot ${selected ? "is-selected" : ""}"
+            type="button"
+            role="option"
+            aria-selected="${selected ? "true" : "false"}"
+            data-slot-start="${b.start}"
+            data-slot-end="${b.end}"
+          >
+            ${escapeHtml(label)}
+          </button>
+        `;
+      })
+      .join("");
+
+    errorEl && (errorEl.hidden = true);
   };
 
   const showDetailStep = (key) => {
@@ -708,6 +1133,65 @@
     const closeBtn = e.target.closest?.("[data-modal-close]");
     if (closeBtn) return closeModal();
 
+    const backBtn = e.target.closest?.("[data-step-back]");
+    if (backBtn) {
+      const form = backBtn.closest("form");
+
+      // If user is editing from Review, "Cancel/Back" returns to Review without saving.
+      if (returnToReview && editMode) {
+        showReviewStep();
+        requestAnimationFrame(() => modalOverlay.querySelector("[data-review-form] button.cta")?.focus?.());
+        return;
+      }
+
+      if (form?.hasAttribute("data-review-form")) {
+        showAddressStep();
+        requestAnimationFrame(() => modalOverlay.querySelector("#addr-street")?.focus?.());
+        return;
+      }
+
+      if (form?.hasAttribute("data-additional-form")) {
+        showReviewStep();
+        requestAnimationFrame(() => modalOverlay.querySelector("[data-review-form] button.cta")?.focus?.());
+        return;
+      }
+
+      if (form?.hasAttribute("data-schedule-form")) {
+        showAdditionalDetailsStep();
+        requestAnimationFrame(() => modalOverlay.querySelector("#add-details")?.focus?.());
+        return;
+      }
+
+      if (form?.hasAttribute("data-schedule-confirm-form")) {
+        showScheduleStep();
+        requestAnimationFrame(() => modalOverlay.querySelector("#sched-date")?.focus?.());
+        return;
+      }
+
+      if (form?.hasAttribute("data-address-form")) {
+        captureAddressDraft(form);
+        showServiceTypeStep();
+        requestAnimationFrame(() => modalOverlay.querySelector('input[name="serviceType"]')?.focus?.());
+        return;
+      }
+
+      if (form?.hasAttribute("data-service-form")) {
+        captureServiceDraft(form);
+        showSystemTypeStep();
+        requestAnimationFrame(() => modalOverlay.querySelector('input[name="systemType"]')?.focus?.());
+        return;
+      }
+
+      if (form?.hasAttribute("data-system-form")) {
+        captureSystemDraft(form);
+        showLeadStep();
+        requestAnimationFrame(() => modalOverlay.querySelector("#lead-name")?.focus?.());
+        return;
+      }
+
+      return;
+    }
+
     const edit = e.target.closest?.("[data-edit-step]");
     if (!edit) return;
     const step = edit.dataset.editStep;
@@ -739,6 +1223,56 @@
       showAddressStep();
       requestAnimationFrame(() => modalOverlay.querySelector("#addr-street")?.focus?.());
     }
+  });
+
+  // Additional details: capture photo selection
+  modalOverlay.addEventListener("change", (e) => {
+    const fileInput = e.target?.closest?.("#add-photos");
+    if (!fileInput) return;
+    const files = Array.from(fileInput.files || []).filter((f) => (f.type || "").startsWith("image/"));
+    additional.photos = files;
+
+    const list = modalOverlay.querySelector("#add-photo-list");
+    if (!list) return;
+    list.innerHTML =
+      files.length > 0
+        ? files
+            .map((f) => `<div class="photo-item">${escapeHtml(f.name)} <span class="muted">(${escapeHtml(formatBytes(f.size))})</span></div>`)
+            .join("")
+        : `<div class="photo-item muted">No photos selected</div>`;
+  });
+
+  // Schedule: date change -> render slots; slot click -> select block
+  modalOverlay.addEventListener("change", (e) => {
+    const dateEl = e.target?.closest?.("#sched-date");
+    if (!dateEl) return;
+    schedule.date = String(dateEl.value || "").trim();
+    schedule.startMin = null;
+    schedule.endMin = null;
+    renderScheduleSlots(schedule.date);
+  });
+
+  // Auto-open date picker on click/focus when supported.
+  modalOverlay.addEventListener("click", (e) => {
+    const dateEl = e.target?.closest?.("#sched-date");
+    if (!dateEl) return;
+    try {
+      dateEl.showPicker?.();
+    } catch {
+      // ignore
+    }
+  });
+
+  modalOverlay.addEventListener("click", (e) => {
+    const slotBtn = e.target.closest?.("[data-slot-start]");
+    if (!slotBtn) return;
+    const start = Number(slotBtn.dataset.slotStart);
+    const end = Number(slotBtn.dataset.slotEnd);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+    schedule.startMin = start;
+    schedule.endMin = end;
+    // re-render to update selected state
+    if (schedule.date) renderScheduleSlots(schedule.date);
   });
 
   // System type: enable the relevant equipment dropdown when selected.
@@ -773,7 +1307,18 @@
     const serviceForm = e.target.closest?.("[data-service-form]");
     const addrForm = e.target.closest?.("[data-address-form]");
     const reviewForm = e.target.closest?.("[data-review-form]");
-    if (!leadForm && !systemForm && !serviceForm && !addrForm && !reviewForm) return;
+    const additionalForm = e.target.closest?.("[data-additional-form]");
+    const scheduleForm = e.target.closest?.("[data-schedule-form]");
+    if (
+      !leadForm &&
+      !systemForm &&
+      !serviceForm &&
+      !addrForm &&
+      !reviewForm &&
+      !additionalForm &&
+      !scheduleForm
+    )
+      return;
     e.preventDefault();
 
     const runValidation = ({ fields, fieldLabels, errorEl }) => {
@@ -846,7 +1391,7 @@
           const firstChoice = modalOverlay.querySelector('input[name="systemType"]');
           firstChoice?.focus?.();
         });
-      }, 2850);
+      }, SPLASH_MS);
       return;
     }
 
@@ -904,7 +1449,7 @@
           const firstChoice = modalOverlay.querySelector('input[name="serviceType"]');
           firstChoice?.focus?.();
         });
-      }, 2850);
+      }, SPLASH_MS);
       return;
     }
 
@@ -942,7 +1487,7 @@
         requestAnimationFrame(() => {
           modalOverlay.querySelector("#addr-street")?.focus?.();
         });
-      }, 2850);
+      }, SPLASH_MS);
       return;
     }
 
@@ -988,40 +1533,94 @@
           const focusable = getFocusable(modalOverlay);
           focusable[0]?.focus?.();
         });
-      }, 2850);
+      }, SPLASH_MS);
       return;
     }
 
     if (reviewForm) {
-      showSplashStep();
+      // Go to additional details page (details required, photos recommended)
+      showAdditionalDetailsStep();
+      requestAnimationFrame(() => modalOverlay.querySelector("#add-details")?.focus?.());
+      return;
+    }
+
+    if (additionalForm) {
+      const detailsEl = additionalForm.querySelector("#add-details");
+      const errorEl = additionalForm.querySelector("[data-form-error]");
+      const details = (detailsEl?.value || "").trim();
+      additional.details = details;
+
+      setInvalid(detailsEl, !details);
+      if (!details) {
+        if (errorEl) {
+          errorEl.textContent = "Please describe the symptoms to continue.";
+          errorEl.hidden = false;
+        }
+        detailsEl?.focus?.();
+        return;
+      }
+      if (errorEl) errorEl.hidden = true;
+
+      // Splash, then schedule step (required)
+      modalBody.innerHTML = splashStepHtmlCustom({
+        title: "Saving your information…",
+        sub: "Information saved. Loading scheduling options.",
+      });
+      window.clearTimeout(splashTimer);
+      splashTimer = window.setTimeout(() => {
+        if (!isModalOpen()) return;
+        showScheduleStep();
+      }, SPLASH_MS);
+      return;
+    }
+
+    if (scheduleForm) {
+      const dateEl = scheduleForm.querySelector("#sched-date");
+      const errorEl = scheduleForm.querySelector("[data-form-error]");
+
+      schedule.date = String(dateEl?.value || "").trim();
+      const hours = schedule.date ? businessHoursForDate(schedule.date) : null;
+
+      if (!schedule.date) {
+        setInvalid(dateEl, true);
+        dateEl?.focus?.();
+        return;
+      }
+      setInvalid(dateEl, false);
+
+      if (!hours) {
+        if (errorEl) {
+          errorEl.textContent = "Sunday is closed. Please choose another day.";
+          errorEl.hidden = false;
+        }
+        return;
+      }
+
+      if (schedule.startMin == null || schedule.endMin == null) {
+        if (errorEl) {
+          errorEl.textContent = "Please select a 4-hour time block to continue.";
+          errorEl.hidden = false;
+        }
+        return;
+      }
+
+      if (errorEl) errorEl.hidden = true;
+
+      // Show scheduling splash, then a confirmation screen.
+      modalBody.innerHTML = splashStepHtmlCustom({
+        title: "Scheduling your appointment…",
+        sub: "Information saved. Loading final details.",
+      });
       window.clearTimeout(splashTimer);
       window.clearTimeout(splashTimer2);
       splashTimer = window.setTimeout(() => {
         if (!isModalOpen()) return;
-
-        // Extra splash before final details.
-        modalBody.innerHTML = `
-          <div class="modal-splash" role="status" aria-live="polite">
-            <div class="splash-stage" aria-hidden="true">
-              <i class="fa-solid fa-fire-flame-curved splash-ico splash-ico-flame" aria-hidden="true"></i>
-              <i class="fa-regular fa-snowflake splash-ico splash-ico-snow" aria-hidden="true"></i>
-              <i class="fa-solid fa-fan splash-ico splash-ico-vent" aria-hidden="true"></i>
-              <i class="fa-solid fa-wind splash-ico splash-ico-air" aria-hidden="true"></i>
-            </div>
-            <p class="splash-title"><strong>Almost done…</strong></p>
-            <p class="splash-sub">Loading final details.</p>
-          </div>
-        `;
-
-        splashTimer2 = window.setTimeout(() => {
-          if (!isModalOpen()) return;
-          showDetailStep(currentModalKey);
-          requestAnimationFrame(() => {
-            const focusable = getFocusable(modalOverlay);
-            focusable[0]?.focus?.();
-          });
-        }, 1600);
-      }, 2850);
+        showScheduleConfirmationStep();
+        requestAnimationFrame(() => {
+          modalOverlay.querySelector("[data-schedule-confirm-form] [data-modal-close]")?.focus?.();
+        });
+      }, SPLASH_MS);
+      return;
     }
   });
 

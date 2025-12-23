@@ -14,6 +14,9 @@
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Splash animation timing (kept in sync with script.js SPLASH_MS) */
+  --splash-dur: 1850ms;
 }
 
 *,
@@ -113,7 +116,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 18px;
   padding: 14px 0;
 }
 
@@ -157,10 +160,10 @@ main {
 }
 
 .brand-mark-img {
-  width: 44px;
-  height: 26px;
+  width: 52px;
+  height: 32px;
   display: block;
-  border-radius: 8px;
+  border-radius: 9px;
   object-fit: contain;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -191,8 +194,8 @@ main {
     font-size: 20px;
   }
   .brand-mark-img {
-    width: 40px;
-    height: 24px;
+    width: 42px;
+    height: 26px;
     border-radius: 8px;
   }
 }
@@ -200,7 +203,7 @@ main {
 .site-nav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 18px;
   flex: 1;
   min-width: 0;
 }
@@ -209,7 +212,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   flex: 1;
   min-width: 0;
 }
@@ -795,9 +798,9 @@ h1 {
 }
 
 .modal-logo {
-  width: 44px;
-  height: 26px;
-  border-radius: 8px;
+  width: 52px;
+  height: 32px;
+  border-radius: 9px;
   object-fit: contain;
   border: 1px solid rgba(255, 255, 255, 0.12);
   flex: 0 0 auto;
@@ -845,9 +848,9 @@ h1 {
   }
 
   .modal-logo {
-    width: 38px;
-    height: 22px;
-    border-radius: 7px;
+    width: 44px;
+    height: 26px;
+    border-radius: 8px;
   }
 }
 
@@ -1074,6 +1077,35 @@ h1 {
   transform: scale(1);
 }
 
+/* Tighten layout specifically for the System Type step */
+#system-group .service-card {
+  padding: 10px 10px;
+  gap: 10px;
+  align-items: center;
+}
+
+#system-group .service-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 13px;
+}
+
+#system-group .service-icon i {
+  font-size: 17px;
+}
+
+#system-group .service-meta {
+  align-self: center;
+}
+
+#system-group .service-title {
+  line-height: 1.15;
+}
+
+#system-group .service-check i {
+  font-size: 18px;
+}
+
 /* System equipment dropdown (expands when selected) */
 .service-details {
   grid-column: 1 / -1;
@@ -1151,8 +1183,17 @@ select.input option {
 .review-section {
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 12px 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.03));
+  padding: 14px 14px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.14);
+  transition:
+    border-color 180ms var(--ease-out),
+    background 180ms var(--ease-out);
+}
+
+.review-section:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035));
 }
 
 .review-head {
@@ -1163,10 +1204,196 @@ select.input option {
   margin-bottom: 10px;
 }
 
+.review-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.review-ico {
+  width: 30px;
+  height: 30px;
+  border-radius: 12px;
+  display: inline-grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(235, 235, 245, 0.9);
+  flex: 0 0 auto;
+}
+
+.review-ico i {
+  font-size: 14px;
+}
+
 .review-title {
   font-weight: 800;
   letter-spacing: -0.02em;
   color: rgba(235, 235, 245, 0.92);
+}
+
+.review-title::after {
+  content: ":";
+}
+
+.hint {
+  margin: 8px 0 0;
+  color: rgba(235, 235, 245, 0.58);
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.hint-title {
+  font-weight: 800;
+  color: rgba(235, 235, 245, 0.72);
+  margin-bottom: 6px;
+}
+
+.hint-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.hint-list li strong {
+  color: rgba(235, 235, 245, 0.78);
+}
+
+.divider {
+  height: 1px;
+  margin: 12px 0;
+  background: rgba(255, 255, 255, 0.10);
+  border: 0;
+}
+
+.input-textarea {
+  resize: vertical;
+  min-height: 110px;
+}
+
+.photo-list {
+  display: grid;
+  gap: 8px;
+}
+
+.photo-item {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(235, 235, 245, 0.88);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: rgba(235, 235, 245, 0.6);
+  font-weight: 600;
+}
+
+/* Schedule step */
+.slots {
+  display: grid;
+  gap: 10px;
+}
+
+.slots-empty {
+  padding: 12px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(235, 235, 245, 0.75);
+  font-weight: 650;
+}
+
+.slot {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(235, 235, 245, 0.92);
+  padding: 12px 12px;
+  border-radius: 16px;
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 180ms var(--ease-out),
+    background 180ms var(--ease-out),
+    border-color 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
+}
+
+.slot:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.slot:active {
+  transform: translateY(0);
+}
+
+.slot.is-selected {
+  border-color: rgba(84, 163, 255, 0.55);
+  background: rgba(84, 163, 255, 0.12);
+  box-shadow: 0 0 0 4px rgba(84, 163, 255, 0.14);
+}
+
+/* Schedule confirmation message */
+.notice {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.03));
+  padding: 14px 14px;
+}
+
+.notice-title {
+  margin: 0 0 6px;
+  color: rgba(235, 235, 245, 0.92);
+  letter-spacing: -0.02em;
+}
+
+.notice-line {
+  margin: 0 0 10px;
+  color: rgba(235, 235, 245, 0.82);
+  font-weight: 750;
+}
+
+.notice-sub {
+  margin: 0;
+  color: rgba(235, 235, 245, 0.62);
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+/* Schedule confirmation emphasis */
+.confirm-title {
+  display: block;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: rgba(235, 235, 245, 0.95);
+  margin-top: 8px;
+}
+
+.confirm-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 14px;
+  background: rgba(52, 199, 89, 0.14);
+  border: 1px solid rgba(52, 199, 89, 0.22);
+  color: rgba(52, 199, 89, 0.95);
+}
+
+.confirm-icon i {
+  font-size: 16px;
 }
 
 .review-edit {
@@ -1197,18 +1424,23 @@ select.input option {
 
 .review-list {
   display: grid;
-  gap: 8px;
   margin: 0;
 }
 
 .review-row {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 10px;
-  align-items: baseline;
+  display: block;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.review-row + .review-row {
+  margin-top: 10px;
 }
 
 .review-row dt {
+  display: inline;
   margin: 0;
   font-size: 12.5px;
   font-weight: 800;
@@ -1216,11 +1448,17 @@ select.input option {
   color: rgba(235, 235, 245, 0.62);
 }
 
+.review-row dt::after {
+  content: ": ";
+}
+
 .review-row dd {
+  display: inline;
   margin: 0;
   color: rgba(235, 235, 245, 0.88);
   font-weight: 650;
   overflow-wrap: anywhere;
+  text-align: left;
 }
 
 /* Splash step */
@@ -1250,36 +1488,38 @@ select.input option {
 
 .splash-ico-snow {
   color: rgba(84, 163, 255, 0.95);
-  animation: splashSnowToFlame 2850ms var(--ease-in-out) infinite;
+  animation: splashSnow  var(--splash-dur) var(--ease-in-out) infinite;
 }
 
 .splash-ico-flame {
   color: rgba(255, 138, 0, 0.95);
-  animation: splashFlame 2850ms var(--ease-in-out) infinite;
+  animation: splashFlame var(--splash-dur) var(--ease-in-out) infinite;
 }
 
 .splash-ico-vent {
   color: rgba(235, 235, 245, 0.85);
-  animation: splashVent 2850ms var(--ease-in-out) infinite;
+  animation: splashVent var(--splash-dur) var(--ease-in-out) infinite;
 }
 
 .splash-ico-air {
   color: rgba(235, 235, 245, 0.85);
-  animation: splashAir 2850ms var(--ease-in-out) infinite;
+  animation: splashAir var(--splash-dur) var(--ease-in-out) infinite;
 }
 
-/* Timeline (2850ms):
-   0-700ms   Flame
-   700-1550  Snow -> Flame morph (crossfade)
-   1550-2250 Vent
-   2250-2850 Airflow
+/* Timeline (100%):
+   0-25%     Flame
+   25-50%    Snow
+   50-75%    Vent
+   75-100%   Airflow
+   Each gets equal time; transitions are smooth cross-fades.
 */
 @keyframes splashFlame {
-  0% {
+  0%,
+  4% {
     opacity: 0;
-    transform: scale(0.86);
+    transform: scale(0.9);
   }
-  8% {
+  10% {
     opacity: 1;
     transform: scale(1);
   }
@@ -1287,9 +1527,9 @@ select.input option {
     opacity: 1;
     transform: scale(1.03);
   }
-  28% {
+  25% {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.98);
   }
   100% {
     opacity: 0;
@@ -1297,22 +1537,21 @@ select.input option {
   }
 }
 
-/* Snow appears, then blends out as a flame fades in (same icon reused above) */
-@keyframes splashSnowToFlame {
+@keyframes splashSnow {
   0%,
-  20% {
+  24% {
     opacity: 0;
-    transform: scale(0.86);
+    transform: scale(0.9);
   }
-  30% {
+  32% {
     opacity: 1;
     transform: scale(1);
   }
-  44% {
+  47% {
     opacity: 1;
     transform: scale(1.04);
   }
-  54% {
+  50% {
     opacity: 0;
     transform: scale(0.96);
   }
@@ -1324,19 +1563,19 @@ select.input option {
 
 @keyframes splashVent {
   0%,
-  52% {
+  49% {
     opacity: 0;
     transform: scale(0.9);
   }
-  60% {
+  57% {
     opacity: 1;
     transform: scale(1);
   }
-  74% {
+  72% {
     opacity: 1;
     transform: scale(1.03);
   }
-  80% {
+  75% {
     opacity: 0;
     transform: scale(0.96);
   }
@@ -1348,11 +1587,11 @@ select.input option {
 
 @keyframes splashAir {
   0%,
-  78% {
+  74% {
     opacity: 0;
     transform: scale(0.9);
   }
-  86% {
+  82% {
     opacity: 1;
     transform: scale(1);
   }
