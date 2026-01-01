@@ -2,6 +2,16 @@
   const yearEl = document.getElementById("legal-year");
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
+  // ---- Booking email (free + no backend) ----
+  // This site is static (no server), so we submit the completed booking details to FormSubmit,
+  // which forwards the submission to your email address.
+  //
+  // 1) Replace the email below with YOUR business email.
+  // 2) Run through one booking — FormSubmit will send you a confirmation email; click "Confirm".
+  // 3) After that, every completed booking will be emailed automatically.
+  const BOOKING_EMAIL_TO = "freedommechanicalcompany@gmail.com";
+  const BOOKING_EMAIL_SUBJECT = "New Online Booking";
+
   // Favicon: browsers render favicons in a square. If we "contain" a very wide logo, it looks tiny.
   // To make it *appear bigger* while still using the same source image, generate a square crop.
   // (The browser still controls actual display size in the tab.)
@@ -220,6 +230,7 @@
   let editMode = null; // "lead" | "system" | "service" | "address" | null
   let additional = { details: "", photos: [] }; // photos are optional; details required
   let schedule = { date: "", startMin: null, endMin: null }; // 4-hour block
+  let bookingEmailSent = false;
 
   // Splash timing
   const SPLASH_MS = 1850; // 1s faster than before (2850ms)
@@ -341,6 +352,243 @@
       });
     } catch {
       return dateStr || "";
+    }
+  };
+
+  const buildBookingSummary = () => {
+    const dateText = schedule.date ? formatDateLong(schedule.date) : "";
+    const timeText =
+      schedule.startMin != null && schedule.endMin != null
+        ? `${formatTime(schedule.startMin)} – ${formatTime(schedule.endMin)}`
+        : "";
+
+    const photoList =
+      additional.photos?.length > 0
+        ? additional.photos
+            .map((f) => `${f.name} (${formatBytes(f.size)})`)
+            .join("\n")
+        : "None";
+
+    return [
+      "New online booking request",
+      "",
+      "CONTACT",
+      `Name: ${lead.name}`,
+      `Phone: ${lead.phone}`,
+      `Email: ${lead.email}`,
+      "",
+      "ADDRESS",
+      `Street: ${address.street}`,
+      `City: ${address.city}`,
+      `State: ${address.state}`,
+      `ZIP: ${address.zip}`,
+      "",
+      "SERVICE",
+      `Service type: ${serviceType}`,
+      `System type: ${systemType}`,
+      `Equipment: ${systemEquipmentType}`,
+      "",
+      "DETAILS",
+      additional.details || "(none)",
+      "",
+      "PHOTOS (names only)",
+      photoList,
+      "",
+      "SCHEDULE",
+      `${dateText}${dateText && timeText ? " • " : ""}${timeText}`,
+    ].join("\n");
+  };
+
+  let bookingEmailStatus = { state: "idle", message: "" }; // idle | skipped | sending | sent | failed
+  const updateBookingEmailStatusUI = () => {
+    const el = modalOverlay?.querySelector?.("[data-booking-email-status]");
+    if (!el) return;
+
+    const to = (BOOKING_EMAIL_TO || "").trim();
+    const base = to ? `Email notification: ${to}` : "Email notification";
+
+    if (bookingEmailStatus.state === "sending") {
+      el.textContent = `${base} (sending…)`;
+      return;
+    }
+    if (bookingEmailStatus.state === "sent") {
+      el.textContent = `${base} (sent)`;
+      return;
+    }
+    if (bookingEmailStatus.state === "skipped") {
+      el.textContent = `${base} (not sent — ${bookingEmailStatus.message || "not configured"})`;
+      return;
+    }
+    if (bookingEmailStatus.state === "failed") {
+      el.textContent = `${base} (failed — ${bookingEmailStatus.message || "blocked"})`;
+      return;
+    }
+
+    el.textContent = `${base} (pending)`;
+  };
+
+  const ensureBookingEmailForm = () => {
+    const existing = document.getElementById("booking-email-form");
+    if (existing) return existing;
+
+    // Hidden iframe prevents navigation away from the page.
+    const iframe = document.createElement("iframe");
+    iframe.name = "booking-email-target";
+    iframe.title = "booking-email-target";
+    iframe.hidden = true;
+    iframe.style.display = "none";
+    document.body.appendChild(iframe);
+
+    const form = document.createElement("form");
+    form.id = "booking-email-form";
+    form.method = "POST";
+    form.target = iframe.name;
+
+    // We'll set form.action dynamically right before submitting (so the email address can be changed).
+
+    // Human-friendly fields (these appear in the email).
+    const fields = [
+      ["customer_name", ""],
+      ["customer_phone", ""],
+      ["customer_email", ""],
+      ["service_type", ""],
+      ["system_type", ""],
+      ["equipment_type", ""],
+      ["address_street", ""],
+      ["address_city", ""],
+      ["address_state", ""],
+      ["address_zip", ""],
+      ["schedule_date", ""],
+      ["schedule_time_window", ""],
+      ["details", ""],
+      ["photos", ""],
+      ["summary", ""],
+
+      // FormSubmit controls
+      ["_subject", BOOKING_EMAIL_SUBJECT],
+      ["_captcha", "false"],
+      // Honeypot (bots fill this; humans won't)
+      ["_honey", ""],
+    ];
+
+    for (const [name, value] of fields) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    }
+
+    document.body.appendChild(form);
+    return form;
+  };
+
+  const setHidden = (form, name, value) => {
+    let input = form.querySelector(`input[name="${CSS.escape(name)}"]`);
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      form.appendChild(input);
+    }
+    input.value = String(value ?? "");
+  };
+
+  const sendBookingEmail = async () => {
+    const to = (BOOKING_EMAIL_TO || "").trim();
+
+    if (!to || to.includes("YOUR_EMAIL_HERE")) {
+      bookingEmailStatus = { state: "skipped", message: "not configured" };
+      updateBookingEmailStatusUI();
+      return { ok: false, skipped: true };
+    }
+    if (bookingEmailSent) return { ok: true, skipped: true };
+
+    bookingEmailStatus = { state: "sending", message: "" };
+    updateBookingEmailStatusUI();
+
+    const dateText = schedule.date ? formatDateLong(schedule.date) : "";
+    const timeText =
+      schedule.startMin != null && schedule.endMin != null
+        ? `${formatTime(schedule.startMin)} – ${formatTime(schedule.endMin)}`
+        : "";
+
+    const photosText =
+      additional.photos?.length > 0
+        ? additional.photos.map((f) => `${f.name} (${formatBytes(f.size)})`).join(", ")
+        : "None";
+
+    const payload = {
+      customer_name: lead.name,
+      customer_phone: lead.phone,
+      customer_email: lead.email,
+      service_type: serviceType,
+      system_type: systemType,
+      equipment_type: systemEquipmentType,
+      address_street: address.street,
+      address_city: address.city,
+      address_state: address.state,
+      address_zip: address.zip,
+      schedule_date: dateText,
+      schedule_time_window: timeText,
+      details: additional.details,
+      photos: photosText,
+      summary: buildBookingSummary(),
+      _subject: BOOKING_EMAIL_SUBJECT,
+      _captcha: "false",
+      _honey: "",
+    };
+
+    // Prefer FormSubmit AJAX endpoint so we can detect success/failure.
+    // If CORS or a blocker prevents fetch, fall back to a hidden form POST.
+    try {
+      const body = new URLSearchParams();
+      for (const [k, v] of Object.entries(payload)) body.set(k, String(v ?? ""));
+
+      const res = await fetch(`https://formsubmit.co/ajax/${to}`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+        },
+        body,
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+
+      bookingEmailSent = true;
+      bookingEmailStatus = { state: "sent", message: "" };
+      updateBookingEmailStatusUI();
+      return { ok: true };
+    } catch (err) {
+      // Fallback: hidden form submission.
+      try {
+        const form = ensureBookingEmailForm();
+        form.action = `https://formsubmit.co/${to}`;
+
+        for (const [k, v] of Object.entries(payload)) setHidden(form, k, v);
+        form.submit();
+
+        bookingEmailSent = true;
+        bookingEmailStatus = {
+          state: "sent",
+          message:
+            "If this is your first time, check your inbox/spam for a FormSubmit confirmation email and click Confirm.",
+        };
+        updateBookingEmailStatusUI();
+        return { ok: true, fallback: true };
+      } catch {
+        bookingEmailStatus = {
+          state: "failed",
+          message:
+            "Check spam for FormSubmit activation, and disable ad/tracker blockers for this page.",
+        };
+        updateBookingEmailStatusUI();
+        console.error("Booking email send failed:", err);
+        return { ok: false };
+      }
     }
   };
 
@@ -742,6 +990,15 @@
             We’ll do our best to arrive within the selected 4-hour window. If demand requires, a member of our team may
             contact you to adjust the scheduled time.
           </p>
+          <p class="notice-sub" style="margin-top:10px;">
+            <strong>Next:</strong> We’ll review your request and reach out to confirm.
+          </p>
+          <p class="notice-sub" style="margin-top:10px;" data-booking-email-status>
+            Email notification: pending
+          </p>
+          <p class="notice-sub" style="margin-top:6px;">
+            If you don’t receive an email, check spam/junk for a one-time FormSubmit confirmation message.
+          </p>
         </div>
 
         <div class="modal-actions">
@@ -1023,6 +1280,7 @@
   const showScheduleConfirmationStep = () => {
     modalTitle.textContent = "Thank you for scheduling an appointment with Freedom Mechanical LLC";
     modalBody.innerHTML = scheduleConfirmationStepHtml();
+    updateBookingEmailStatusUI();
   };
 
   const renderScheduleSlots = (dateStr) => {
@@ -1082,6 +1340,8 @@
     currentModalKey = key in MODAL_CONTENT ? key : "schedule";
     const content = MODAL_CONTENT[currentModalKey] || MODAL_CONTENT.schedule;
     lastFocusedEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    bookingEmailSent = false;
+    bookingEmailStatus = { state: "idle", message: "" };
 
     modalTitle.textContent = "Schedule an Appointment Online!";
     showLeadStep();
@@ -1605,6 +1865,10 @@
       }
 
       if (errorEl) errorEl.hidden = true;
+
+      // Send the full booking details to your email (no backend).
+      // Fire-and-forget: the confirmation screen shows sent/failed status.
+      sendBookingEmail().finally(() => updateBookingEmailStatusUI());
 
       // Show scheduling splash, then a confirmation screen.
       modalBody.innerHTML = splashStepHtmlCustom({

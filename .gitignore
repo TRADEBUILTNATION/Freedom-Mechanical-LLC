@@ -1,4 +1,16 @@
-﻿# dependencies/build
+﻿# Editor / IDE
+.cursor/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Node / build artifacts (if you add tooling later)
+node_modules/
+dist/
+build/
+
+# dependencies/build
 node_modules/
 dist/
 build/
